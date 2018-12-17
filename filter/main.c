@@ -1,15 +1,15 @@
 // main.c
 #include <stdio.h>
-//#include <stdint.h>
 
 #define INPUT_SAMPLE_LEN 1
 #define FILTER_LEN 24
 #define INPUT_BUFFER_LEN FILTER_LEN - 1 + INPUT_SAMPLE_LEN
 
-float inSamp[INPUT_BUFFER_LEN];
-float outSamp[INPUT_BUFFER_LEN];
+float sampleBuffer[INPUT_BUFFER_LEN];
+float unfiltered[3220];
+float filtered[3220];
 
-float coeffs[FILTER_LEN] = { 0.0061539,0.0075251,0.0114762,0.0177629,0.0259528,0.0354573,
+double coeffs[FILTER_LEN] = { 0.0061539,0.0075251,0.0114762,0.0177629,0.0259528,0.0354573,
 							0.0455770,0.0555560,0.0646414,0.0721428,0.0774877,0.0802668,
 							0.0802668,0.0774877,0.0721428,0.0646414,0.0555560,0.0455770,
 							0.0354573,0.0259528,0.0177629,0.0114762,0.0075251,0.0061539 };
@@ -37,13 +37,13 @@ float LowPassFilter(int chan, float tempin)
 	int n = idx % INPUT_BUFFER_LEN;
 
 	// write new sample to the location of the oldest sample, start at 0
-	inSamp[n] = tempin;
+	sampleBuffer[n] = tempin;
 
 	// apply filter to the input sample
 	acc = 0;
 	for (k = 0; k < FILTER_LEN; k++)
 	{
-		acc += coeffs[k] * inSamp[(n + INPUT_BUFFER_LEN - k) % INPUT_BUFFER_LEN];
+		acc += (float)coeffs[k] * sampleBuffer[(n + INPUT_BUFFER_LEN - k) % INPUT_BUFFER_LEN];
 	}
 	idx++;
 	return acc;
@@ -53,14 +53,16 @@ int main()
 {
 	int i, len;
 
+	// open input file
+
 	// initialize signal array
-	len = sizeof inSamp / sizeof(float);
-	signalInit(0, inSamp, len);
-	printf("length of signal: %d\n", sizeof inSamp / sizeof(float));
+	len = sizeof sampleBuffer / sizeof(float);
+	signalInit(0, sampleBuffer, len);
+	//printf("length of signal: %d\n", sizeof inSamp / sizeof(float));
 	
 	for (i = 0; i < len; i++)
 	{
-		printf("%.3f\n", inSamp[i]);
+		printf("%.3f\n", sampleBuffer[i]);
 	}
 
 	return 0;
