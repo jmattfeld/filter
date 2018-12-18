@@ -55,10 +55,10 @@ float LowPassFilter(int chan, float tempin)
 {
 	float acc;	// accumulator
 	int k;		// coeff idx
-	static unsigned idx = 0;
-	int n = idx % INPUT_BUFFER_LEN;
+	static unsigned idx[NUM_CHANNELS];
+	int n = idx[chan] % INPUT_BUFFER_LEN;
 
-	// write new sample to the index of the oldest sample, start at 0
+	// write new sample to the index of the oldest sample
 	sampleBuffer[chan - 1][n] = tempin;
 
 	// apply filter to the input sample
@@ -69,7 +69,7 @@ float LowPassFilter(int chan, float tempin)
 	}
 
 	// move the idnex into the input buffer for next function call
-	idx++;
+	idx[chan]++;
 	return acc;
 }
 
