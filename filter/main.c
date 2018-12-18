@@ -53,22 +53,24 @@ int signalInit(float tempin, float *pSignal, int len)
 
 float LowPassFilter(int chan, float tempin)
 {
-	float acc;	// accumulator
-	int k;		// coeff idx
+	float acc = 0;	// accumulator
+	int k;			// coeff idx
+
+	// circular buffer index
 	static unsigned idx[NUM_CHANNELS];
 	int n = idx[chan] % INPUT_BUFFER_LEN;
 
 	// write new sample to the index of the oldest sample
 	sampleBuffer[chan - 1][n] = tempin;
 
-	// apply filter to the input sample
-	acc = 0;
+	// apply filter to the input sample:
+	// y[n] = sum_{k=0}..{N-1}(h(k) * x(n-k))
 	for (k = 0; k < FILTER_LEN; k++)
 	{
 		acc += (float)coeffs[k] * sampleBuffer[chan - 1][(n + INPUT_BUFFER_LEN - k) % INPUT_BUFFER_LEN];
 	}
 
-	// move the idnex into the input buffer for next function call
+	// move the index for next function call and return sum
 	idx[chan]++;
 	return acc;
 }
@@ -107,17 +109,18 @@ int main()
 	int i, len;
 	FILE *infp, *outfp;
 	char tstr[24];
-	const char * outfilename = OUTPUT_PATH OUTFILE;
+	//const char * outfilename = OUTPUT_PATH OUTFILE;
 
 	// open input file
-	printf("Opening %s\n", INFILE);
+	printf("Opening %s for reading\n", INFILE);
 	infp = fopen(INFILE, "r");
 	if (NULL == infp)
 		return -1;
 
 	// open output file
-	printf("Opening %s\n", OUTFILE);
-	outfp = fopen(outfilename, "w");
+	printf("Opening %s for writing\n", OUTFILE);
+	//outfp = fopen(outfilename, "w");
+	outfp = fopen(OUTFILE, "w");
 	if (NULL == outfp)
 		return -1;
 
@@ -133,17 +136,22 @@ int main()
 	}
 
 	// initialize signal array
+	printf("Initializing input signal buffer\n");
 	len = sizeof sampleBuffer[0] / sizeof(float);
 	signalInit(0, sampleBuffer[0], len);
 
 	// apply filter (using single channel buffer)
+	printf("Applying filter to simulated signal stream\n");
+	printf("and writing filtered data to output file\n");
 	for (i = 0; i < SIMULATED_DATA_PTS; i++)
 	{
 		filtered[i] = LowPassFilter(1, unfiltered[i]);
 		fprintf(outfp, "%.3f\n", filtered[i]);
 	}
 
+	printf("Closing %s\n", INFILE);
 	fclose(infp);
+	printf("Closing %s\n", OUTFILE);
 	fclose(outfp);
 
 	return 0;
