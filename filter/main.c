@@ -7,7 +7,7 @@
 
 #define SIMULATED_DATA_PTS 3220
 #define NUM_CHANNELS 64
-#define INPUT_SAMPLE_LEN 1
+#define INPUT_SAMPLE_LEN 5
 #define FILTER_LEN 10
 #define INPUT_BUFFER_LEN FILTER_LEN - 1 + INPUT_SAMPLE_LEN
 #define INFILE "unfiltered.csv"
@@ -51,26 +51,34 @@ int signalInit(float tempin, float *pSignal, int len)
 	return 0;
 }
 
-float LowPassFilter(int chan, float tempin)
+float LowPassFilter(int chan, float *tempin, int num)
 {
 	float acc;	// accumulator
-	int k;		// coeff idx
-	static unsigned idx = 0;
-	int n = idx % INPUT_BUFFER_LEN;
+	int i, k;		// sample idx, coeff idx
+	static unsigned idx[NUM_CHANNELS];
+	int n = idx[chan - 1] % INPUT_BUFFER_LEN;
+	int nBytes = num * sizeof(float);
 
 	// write new sample to the index of the oldest sample, start at 0
-	sampleBuffer[chan - 1][n] = tempin;
+	//sampleBuffer[chan - 1][n] = tempin;
 
-	// apply filter to the input sample
-	acc = 0;
-	for (k = 0; k < FILTER_LEN; k++)
+	// copy num*sizeof(float) from tempin to sampleBuffer
+	printf("copying %d bytes for %d floats to sampleBuffer\n", nBytes, num);
+	memcpy(&sampleBuffer[chan - 1][n], tempin, nBytes);
+
+	// apply filter to each input sample for this call
+	for (i = 0; i < num; i++)
 	{
-		acc += (float)coeffs[k] * sampleBuffer[chan - 1][(n + INPUT_BUFFER_LEN - k) % INPUT_BUFFER_LEN];
+		acc = 0;
+		for (k = 0; k < FILTER_LEN; k++)
+		{
+			// y(n) = sum_{k=0 to N-1} (h(k)*x(n-k))
+			acc += (float)coeffs[k] * sampleBuffer[chan - 1][(n + i + INPUT_BUFFER_LEN - k) % INPUT_BUFFER_LEN];
+		}
 	}
 
-	// move the idnex into the input buffer for next function call
-	idx++;
-	return acc;
+	// move the index into the input buffer for next function call
+	idx[chan - 1] += num;
 }
 
 int ReadLine(FILE *fp, char * tstr) 
@@ -137,9 +145,9 @@ int main()
 	signalInit(0, sampleBuffer[0], len);
 
 	// apply filter (using single channel buffer)
-	for (i = 0; i < SIMULATED_DATA_PTS; i++)
+	for (i = 0; i < SIMULATED_DATA_PTS; i + INPUT_SAMPLE_LEN)
 	{
-		filtered[i] = LowPassFilter(1, unfiltered[i]);
+		filtered[i] = LowPassFilter(1, &unfiltered[i], INPUT_SAMPLE_LEN);
 		fprintf(outfp, "%.3f\n", filtered[i]);
 	}
 
