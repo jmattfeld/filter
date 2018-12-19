@@ -7,7 +7,7 @@
 
 #define SIMULATED_DATA_PTS 3220
 #define NUM_CHANNELS 64
-#define INPUT_SAMPLE_LEN 5
+#define INPUT_SAMPLE_LEN 20
 #define FILTER_LEN 10
 #define INPUT_BUFFER_LEN (FILTER_LEN - 1 + INPUT_SAMPLE_LEN)
 #define INPUT_PATH "C:\\Users\\Jeremy.SV\\Documents\\octave-projects\\outputs\\"
@@ -54,23 +54,38 @@ int signalInit(float tempin, float *pSignal, int len)
 
 void LowPassFilter(int chan, float *tempin, float *tempout, int num)
 {
-	float acc;	// accumulator
+	float acc;		// accumulator
 	int i, k;		// sample idx, coeff idx
 	static unsigned idx[NUM_CHANNELS];
 	int n = idx[chan - 1] % INPUT_BUFFER_LEN; // input buffer idx
 	int nBytes = num * sizeof(float);
+	int nWrap;
 
-	// copy num*sizeof(float) from tempin to sampleBuffer
-	//printf("copying %d bytes for %d floats to sampleBuffer\n", nBytes, num);
-	memcpy(&sampleBuffer[chan - 1][n], tempin, nBytes);
+	//printf("idx=%d, n=%d for this call\n", idx[chan - 1], n);
+
+	if (n + num < INPUT_BUFFER_LEN)
+	{
+		//printf("copying %d bytes for %d floats to sampleBuffer\n", nBytes, num);
+		memcpy(&sampleBuffer[chan - 1][n], tempin, nBytes);
+	}
+	else // wrap the new input samples around to the front of the input buffer
+	{
+		nWrap = n + num - INPUT_BUFFER_LEN;
+		//printf("copying %d bytes for %d floats to hi side of sampleBuffer\n", nBytes - nWrap * sizeof(float), num - nWrap);
+		memcpy(&sampleBuffer[chan - 1][n], tempin, nBytes - nWrap * sizeof(float));
+		//printf("copying %d bytes for %d floats to lo side of sampleBuffer\n", nWrap * sizeof(float), nWrap);
+		memcpy(&sampleBuffer[chan - 1][0], tempin + num - nWrap, nWrap * sizeof(float));
+	}
 
 	// apply filter to each input sample for this call
 	for (i = 0; i < num; i++)
 	{
+		//printf("**********************************\n");
 		acc = 0;
 		for (k = 0; k < FILTER_LEN; k++)
 		{
 			// y(n) = sum_{k=0 to N-1} (h(k)*x(n-k))
+			//printf("y[%d] += h[%d] * x[%d] = %f\n", ((n + i) % INPUT_BUFFER_LEN), k, ((n + i + INPUT_BUFFER_LEN - k) % INPUT_BUFFER_LEN), acc);
 			acc += (float)coeffs[k] * sampleBuffer[chan - 1][(n + i + INPUT_BUFFER_LEN - k) % INPUT_BUFFER_LEN];
 		}
 		tempout[i] = acc;
@@ -144,6 +159,9 @@ int main()
 	// initialize signal array
 	len = sizeof sampleBuffer[0] / sizeof(float);
 	signalInit(0, sampleBuffer[0], len);
+	printf("sample length: %d\n", INPUT_SAMPLE_LEN);
+	printf("filter length: %d\n", FILTER_LEN);
+	printf("input buffer length: %d\n", INPUT_BUFFER_LEN);
 
 	// pointer to beginning of simulated datastream
 	pSample = &unfiltered[0];
@@ -151,6 +169,8 @@ int main()
 	// apply filter (using single channel buffer)
 	for (i = 0; i < SIMULATED_DATA_PTS; i += INPUT_SAMPLE_LEN)
 	{
+		//printf("processing unfiltered[%d .. %d]\n", i, i + INPUT_SAMPLE_LEN);
+		//printf("*****************************\n");
 		LowPassFilter(1, pSample, pOut, INPUT_SAMPLE_LEN);
 		// print the filtered results to .CSV file
 		for (j = 0; j < INPUT_SAMPLE_LEN; j++)
