@@ -9,9 +9,10 @@
 #define NUM_CHANNELS 64
 #define INPUT_SAMPLE_LEN 5
 #define FILTER_LEN 10
-#define INPUT_BUFFER_LEN FILTER_LEN - 1 + INPUT_SAMPLE_LEN
+#define INPUT_BUFFER_LEN (FILTER_LEN - 1 + INPUT_SAMPLE_LEN)
+#define INPUT_PATH "C:\\Users\\Jeremy.SV\\Documents\\octave-projects\\outputs\\"
 #define INFILE "unfiltered.csv"
-#define OUTPUT_PATH "C:\\Users\\Jeremy.SV\\Documents\\octave-projects\\"
+#define OUTPUT_PATH "C:\\Users\\Jeremy.SV\\Documents\\octave-projects\\data\\"
 #define OUTFILE "filtered.csv"
 
 float sampleBuffer[NUM_CHANNELS][INPUT_BUFFER_LEN];
@@ -51,19 +52,16 @@ int signalInit(float tempin, float *pSignal, int len)
 	return 0;
 }
 
-float LowPassFilter(int chan, float *tempin, int num)
+void LowPassFilter(int chan, float *tempin, float *tempout, int num)
 {
 	float acc;	// accumulator
 	int i, k;		// sample idx, coeff idx
 	static unsigned idx[NUM_CHANNELS];
-	int n = idx[chan - 1] % INPUT_BUFFER_LEN;
+	int n = idx[chan - 1] % INPUT_BUFFER_LEN; // input buffer idx
 	int nBytes = num * sizeof(float);
 
-	// write new sample to the index of the oldest sample, start at 0
-	//sampleBuffer[chan - 1][n] = tempin;
-
 	// copy num*sizeof(float) from tempin to sampleBuffer
-	printf("copying %d bytes for %d floats to sampleBuffer\n", nBytes, num);
+	//printf("copying %d bytes for %d floats to sampleBuffer\n", nBytes, num);
 	memcpy(&sampleBuffer[chan - 1][n], tempin, nBytes);
 
 	// apply filter to each input sample for this call
@@ -75,6 +73,7 @@ float LowPassFilter(int chan, float *tempin, int num)
 			// y(n) = sum_{k=0 to N-1} (h(k)*x(n-k))
 			acc += (float)coeffs[k] * sampleBuffer[chan - 1][(n + i + INPUT_BUFFER_LEN - k) % INPUT_BUFFER_LEN];
 		}
+		tempout[i] = acc;
 	}
 
 	// move the index into the input buffer for next function call
@@ -112,14 +111,16 @@ int ReadLine(FILE *fp, char * tstr)
 
 int main()
 {
-	int i, len;
+	int i, j, len;
 	FILE *infp, *outfp;
 	char tstr[24];
+	const char * inpfilename = INPUT_PATH INFILE;
 	const char * outfilename = OUTPUT_PATH OUTFILE;
+	float *pSample, *pOut;
 
 	// open input file
 	printf("Opening %s\n", INFILE);
-	infp = fopen(INFILE, "r");
+	infp = fopen(inpfilename, "r");
 	if (NULL == infp)
 		return -1;
 
@@ -144,11 +145,21 @@ int main()
 	len = sizeof sampleBuffer[0] / sizeof(float);
 	signalInit(0, sampleBuffer[0], len);
 
+	// pointer to beginning of simulated datastream
+	pSample = &unfiltered[0];
+	pOut = &filtered[0];
 	// apply filter (using single channel buffer)
-	for (i = 0; i < SIMULATED_DATA_PTS; i + INPUT_SAMPLE_LEN)
+	for (i = 0; i < SIMULATED_DATA_PTS; i += INPUT_SAMPLE_LEN)
 	{
-		filtered[i] = LowPassFilter(1, &unfiltered[i], INPUT_SAMPLE_LEN);
-		fprintf(outfp, "%.3f\n", filtered[i]);
+		LowPassFilter(1, pSample, pOut, INPUT_SAMPLE_LEN);
+		// print the filtered results to .CSV file
+		for (j = 0; j < INPUT_SAMPLE_LEN; j++)
+		{
+			fprintf(outfp, "%.3f\n", filtered[i + j]);
+		}
+		// advance the datastream pointers
+		pSample += INPUT_SAMPLE_LEN;
+		pOut += INPUT_SAMPLE_LEN;
 	}
 
 	fclose(infp);
