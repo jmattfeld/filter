@@ -1,4 +1,11 @@
-// main.c
+//=======================================================
+// filename: main.c
+// author: Jeremy Mattfeld
+// email: jmattfeld@scanivalve.com
+//
+// LowPassFilter() function and supporting test functions
+//=======================================================
+
 #define _CRT_SECURE_NO_WARNINGS
 
 #include <stdio.h>
@@ -10,17 +17,21 @@
 #define INPUT_SAMPLE_LEN 20
 #define FILTER_LEN 10
 #define INPUT_BUFFER_LEN (FILTER_LEN - 1 + INPUT_SAMPLE_LEN)
+
+// I/O file definitions.  These may need to be modified according to your environment.
 #define INPUT_PATH "C:\\Users\\Jeremy.SV\\Documents\\octave-projects\\outputs\\"
 #define INFILE "unfiltered.csv"
 #define OUTPUT_PATH "C:\\Users\\Jeremy.SV\\Documents\\octave-projects\\data\\"
 #define OUTFILE "filtered.csv"
 
+// global static memory here.  Not sure if we need a buffer for each Px channel or just one for each Tx sensor.
 float sampleBuffer[NUM_CHANNELS][INPUT_BUFFER_LEN];
 
 // simulated in/out streams
 float unfiltered[SIMULATED_DATA_PTS];
 float filtered[SIMULATED_DATA_PTS];
 
+// filter definitions here.  Make sure to redefine the FILTER_LEN constant above where appropriate
 // FILTER_LEN 10 / cutoff freq=0.010417 Hz
 double coeffs[FILTER_LEN] = { 0.016154,0.037930,0.093105,0.155901,0.196910,
 							  0.196910,0.155901,0.093105,0.037930,0.016154 };
@@ -52,6 +63,20 @@ int signalInit(float tempin, float *pSignal, int len)
 	return 0;
 }
 
+///===================================================================================
+/// Description:
+///		Applies a discrete-time convolution ov the filter
+///		coefficients over the input
+///
+///	Parameters:
+///		int chan		- the channel that we are filtering samples for
+///		float *tempin	- address of the first sample to filter in the input array
+///		float *tempin	- address of the output array to copy the filtered samples to
+///		int num			- number of samples to filter this invocation
+///
+///	Returns:
+///		void
+///===================================================================================
 void LowPassFilter(int chan, float *tempin, float *tempout, int num)
 {
 	float acc;		// accumulator
